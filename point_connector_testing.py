@@ -17,7 +17,10 @@ def point_connector(point_list, orientation, velocity, stop=False):
         print('new point index: ', i)
         if i==end_point_index:
             break
-        p1=point
+        if i==0:
+            p1=point
+        else:
+            p1=last_point
         p2=point_list[i+1]
         moves=0
         point_diff_x=p1[0]-p2[0]
@@ -79,9 +82,10 @@ def point_connector(point_list, orientation, velocity, stop=False):
             points.append(p1)
             print('point: ',p1)
             print('velocity: ', velocity)
+            last_point=p1
     return points
 
-point_list=[[0,0], [4,7], [3,9], [1,14]] #, [1,14],[5,15]
+point_list=[[0,0], [4,7], [1,10]]#, [1,14]] #, [1,14],[5,15]
 points=point_connector(point_list, 0, 0)
 m = Maze2D.from_pgm(maze_path)
 m.plot_path(points, 'Maze2D')
