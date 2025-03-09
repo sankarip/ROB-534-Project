@@ -1,0 +1,70 @@
+import math
+from maze import Maze2D, Maze4D
+import numpy as np
+
+maze_path='maze2.pgm'
+def point_connector(point_list, orientation, velocity, stop=False):
+    points = []
+    end_point_index = len(point_list) - 1
+
+    for i, point in enumerate(point_list):
+        if i == end_point_index:
+            break
+
+        if i == 0:
+            p1 = point
+        else:
+            p1 = last_point
+
+        p2 = point_list[i + 1]
+        moves = 0
+
+        while moves < 10:
+            moves += 1
+            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+
+            if distance < 0.1:
+                break
+
+            angle_rad = math.atan2(dy, dx)
+            angle_deg = math.degrees(angle_rad)
+
+            orientation_change = (angle_deg - orientation + 180) % 360 - 180  
+            if abs(orientation_change) < 1e-3:
+                orientation_change = 0  
+
+            if orientation_change != 0:
+                orientation_factor = max(abs(orientation_change), 1)
+                desired_velocity = max(distance / orientation_factor, 0.3)
+            else:
+                desired_velocity = min(distance, 2)
+
+            velocity_change = np.clip(desired_velocity - velocity, -1, 1)
+            velocity = np.clip(velocity + velocity_change, 0, 2)
+
+            orientation += np.clip(orientation_change, -10, 10)
+            x_change = math.cos(math.radians(orientation)) * velocity
+            y_change = math.sin(math.radians(orientation)) * velocity
+
+            p1 = [p1[0] + x_change, p1[1] + y_change]
+            points.append(p1)
+            last_point = p1
+
+    return points
+
+
+point_list=[[0,0], [4,7], [1,10]]#, [1,14]] #, [1,14],[5,15]
+points=point_connector(point_list, 0, 0)
+m = Maze2D.from_pgm(maze_path)
+m.plot_path(points, 'Maze2D')
+
+#do we need to A* this?
+#def get_neighbors(state):
+    #state is x,y,v,orientation
+    #assume that you either go straight or turn in 5 degree
+
+def trig_testing():
+    print(math.sin(math.radians(80)))
+
+#trig_testing()
