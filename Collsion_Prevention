@@ -1,0 +1,45 @@
+import math
+
+
+def predict_position(x, y, velocity, orientation, time_step=1):
+    """Predicts position"""
+    x_new = x + math.cos(math.radians(orientation)) * velocity * time_step
+    y_new = y + math.sin(math.radians(orientation)) * velocity * time_step
+    return x_new, y_new
+
+
+def monitor_collisions(robot_states, goal, time_horizon=3, safety_radius=0.5):
+    """
+    Check collisions and return v for yielding robots
+    robot_states is list of [{id, x, y, velocity, orientation}], 1 for each robot
+    """
+    updates = {}
+
+    for i, r1 in enumerate(robot_states):
+        for j, r2 in enumerate(robot_states):
+            if i >= j:  # Avoid duplicates
+                continue
+            
+            # Compute priority  (closer to goal = higher priority)
+            p1 = math.sqrt((r1["x"] - goal[0])**2 + (r1["y"] - goal[1])**2)
+            p2 = math.sqrt((r2["x"] - goal[0])**2 + (r2["y"] - goal[1])**2)
+
+            for t in range(1, time_horizon + 1):
+                x1, y1 = predict_position(r1["x"], r1["y"], r1["velocity"], r1["orientation"], t)
+                x2, y2 = predict_position(r2["x"], r2["y"], r2["velocity"], r2["orientation"], t)
+                
+                distance = math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+                
+                if distance < safety_radius:
+                    # Scale velocity based on proximity
+                    scale_factor = distance / safety_radius  
+                    new_velocity = r1["velocity"] * scale_factor
+                    
+                    # Rob with lowest prioirty (highest number) yileds
+                    if p1 < p2:
+                        updates[r2["id"]] = new_velocity
+                    else:
+                        updates[r1["id"]] = new_velocity
+                    break  
+
+    return updates
