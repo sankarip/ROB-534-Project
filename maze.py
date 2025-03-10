@@ -139,7 +139,7 @@ class Maze(abc.ABC):
 
             x=point[0]
             y=point[1]
-            plt.plot(x, y, marker='o', linestyle='none', color=colors[i])
+            plt.plot(x, y, marker='o', linestyle='none', color=colors[i],markersize=1)
         return fig
 
     def get_goal(self):

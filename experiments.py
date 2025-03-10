@@ -69,6 +69,7 @@ def PSO(maze_path, start_state):
             (not m.check_hit(tuple(path[i]), np.array(path[i + 1]) - np.array(path[i])) for i in range(len(path) - 1))
         path = np.array(path)
         if is_valid_path:
+            #need to update orientation in other parts of code too
             refined_path, cant_connect, orientation, velocity = point_connector(path, 90, 0)
             if not cant_connect:
                 break
@@ -149,7 +150,7 @@ def predict_position(x, y, velocity, orientation, time_step=1):
     return x_new, y_new
 
 
-def monitor_collisions(robot_states, goal, time_horizon=3, safety_radius=0.5):
+def monitor_collisions(robot_states, goal, time_horizon=1, safety_radius=0.5):
     """
     Check collisions and return v for yielding robots
     robot_states is list of [{id, x, y, velocity, orientation}], 1 for each robot
@@ -187,7 +188,7 @@ def monitor_collisions(robot_states, goal, time_horizon=3, safety_radius=0.5):
 
     return updates, updated
 
-def point_connector(point_list, orientation, velocity, stop=False):
+def point_connector(point_list, orientation, velocity):
     #0 degrees points right
     #-90 degrees points up
     #positive y is down
@@ -217,7 +218,7 @@ def point_connector(point_list, orientation, velocity, stop=False):
         point_diff_x=p1[0]-p2[0]
         point_diff_y=p1[1]-p2[1]
         #while not (round(p1[0])==round(p2[0]) and round(p1[1])==round(p2[1])):
-        while (abs(point_diff_x)>0.1 or abs(point_diff_y)>0.1) and moves<20:
+        while (abs(point_diff_x)>0.1 or abs(point_diff_y)>0.1) and moves<15:
         #for i in range(0,10):
             moves+=1
             dx = p2[0] - p1[0]
@@ -301,6 +302,7 @@ def point_connector_full(point_lists, orientations, velocities, collision_avoida
     #initialize starting points and points chasing
     goal_points=[]
     start_time=time.time()
+    first_update=True
     for j, point_list in enumerate(point_lists):
         curr_points.append(point_list[0])
         final_points[j].append(point_list[0])
@@ -404,18 +406,30 @@ def point_connector_full(point_lists, orientations, velocities, collision_avoida
             robot_states.append(robot_state)
         updates,updated=monitor_collisions(robot_states, (24,24))
         if updated and collision_avoidance:
+            if first_update:
+                print('robot states leading to collision: ', robot_states)
             robots_updated=list(updates.keys())
+            if first_update:
+                print('updating these robots: ', robots_updated)
+                print('final_points before updating: ', final_points)
             for robot in robots_updated:
                 new_velocity=updates[robot]
-                velocities[j]=new_velocity
-                old_start_point=final_points[j][len(final_points[j])-2]
+                if first_update:
+                    print('robot: ', robot, ' new velocity: ', new_velocity)
+                velocities[robot]=new_velocity
+                old_start_point=final_points[robot][len(final_points[robot])-2]
                 #maybe messing things up?
-                old_orientation=final_orientations[j][len(final_points[j])-2]
+                old_orientation=final_orientations[robot][len(final_points[robot])-2]
                 x_change = math.cos(math.radians(old_orientation)) * new_velocity
                 y_change = math.sin(math.radians(old_orientation)) * new_velocity
                 new_point=[old_start_point[0]+x_change, old_start_point[1]+y_change]
-                curr_points[j]=new_point
-                final_points[j][len(final_points[j]) - 1]=new_point
+                if first_update:
+                    print('robot: ', robot, ' new point: ', new_point)
+                curr_points[robot]=new_point
+                final_points[robot][len(final_points[robot]) - 1]=new_point
+            if first_update:
+                print('final_points after updating: ', final_points)
+            first_update=False
     run_time = time.time() - start_time
     #sum distance of all paths
     path_distance=0
@@ -477,7 +491,8 @@ def RRT(maze_path, start_state):
     vertexes=[]
     vertexes.append(start_state)
     orientation_velocity=[]
-    orientation_velocity.append([0,0])
+    #update orientation here
+    orientation_velocity.append([90,0])
     edges=[]
     start_time = time.time()
     while not solved:
@@ -547,8 +562,13 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
         RRT_time=0
         PSO_time=0
         #random start locations in upper left corner
+        start_locations=[]
         for agent in range(num_agents):
             start_location=[random.randint(0, 3), random.randint(0, 3)]
+            #dont start in the same place
+            while start_location in start_locations:
+                start_location = [random.randint(0, 3), random.randint(0, 3)]
+            start_locations.append(start_location)
             #get trial data
             RRT_path, RRT_run_time, RRT_path_distance=RRT(maze_path,start_location)
             RRT_paths.append(RRT_path)
@@ -560,6 +580,7 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
         RRT_cd_paths, RRT_cd_time, RRT_cd_path_distance=point_connector_full(RRT_paths, [0]*num_agents, [0]*num_agents)
         #make gif of the first trial
         if trial==0 and gif:
+            print('making RRT animation...')
             paths_animator(RRT_cd_paths, maze_path, 'RRT_paths')
         RRT_time+=RRT_cd_time
         #total calculation time
@@ -569,14 +590,12 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
         #average path simulation time
         total_RRT_path_time=0
         for path in RRT_cd_paths:
-            print('making animation...')
             total_RRT_path_time+=len(path)
         RRT_path_times.append(total_RRT_path_time/num_agents)
-
-        PSO_cd_paths, PSO_cd_time, PSO_cd_path_distance=point_connector_full(PSO_paths, [0]*num_agents, [0]*num_agents)
+        PSO_cd_paths, PSO_cd_time, PSO_cd_path_distance=point_connector_full(PSO_paths, [90]*num_agents, [0]*num_agents)
         #make gif of the first trial
         if trial==0 and gif:
-            print('making animation...')
+            print('making PSO animation...')
             paths_animator(PSO_cd_paths, maze_path, 'PSO_paths')
         PSO_time+=PSO_cd_time
         #total calculation time
@@ -598,6 +617,7 @@ def paths_animator(paths, maze_path, output_path):
         #print('path: ', path)
         if len(path)>max_path_length:
             max_path_length=len(path)
+    print('frames to animate: ', max_path_length)
     for i in range(max_path_length):
         points_to_plot = []
         for path in paths:
@@ -618,7 +638,7 @@ def paths_animator(paths, maze_path, output_path):
     frames[0].save(output_path+".gif", save_all=True, append_images=frames[1:], duration=100, loop=0)
 
 
-RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,1, 'maze2.pgm', gif=True)
+RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,1, 'maze2.pgm', gif=True)
 
 
 # RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')
@@ -630,6 +650,9 @@ RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times
 # print(np.average(RRT_path_times))
 # print(np.average(PSO_path_times))
 
+#TO DO
+#get some good gifs
+#make results graphs
 
 
 
