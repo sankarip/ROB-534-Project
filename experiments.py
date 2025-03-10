@@ -5,6 +5,9 @@ import random
 from maze import Maze2D  # Import Maze2D for obstacle checking
 from sklearn.neighbors import NearestNeighbors
 import pickle
+import matplotlib.pyplot as plt
+from PIL import Image
+import io
 
 maze_path='maze2.pgm'
 
@@ -529,7 +532,7 @@ def RRT(maze_path, start_state):
     #m.plot_path(np.array(path), 'Maze2D')
     return path, run_time, path_distance
 
-def run_experiment(num_agents, num_trials, maze_path):
+def run_experiment(num_agents, num_trials, maze_path, gif=False):
     RRT_calculation_times=[]
     RRT_path_distances=[]
     RRT_path_times=[]
@@ -555,6 +558,9 @@ def run_experiment(num_agents, num_trials, maze_path):
             PSO_time+=PSO_run_time
         #cd for collision detections
         RRT_cd_paths, RRT_cd_time, RRT_cd_path_distance=point_connector_full(RRT_paths, [0]*num_agents, [0]*num_agents)
+        #make gif of the first trial
+        if trial==0 and gif:
+            paths_animator(RRT_cd_paths, maze_path, 'RRT_paths')
         RRT_time+=RRT_cd_time
         #total calculation time
         RRT_calculation_times.append(RRT_time)
@@ -563,10 +569,15 @@ def run_experiment(num_agents, num_trials, maze_path):
         #average path simulation time
         total_RRT_path_time=0
         for path in RRT_cd_paths:
+            print('making animation...')
             total_RRT_path_time+=len(path)
         RRT_path_times.append(total_RRT_path_time/num_agents)
 
         PSO_cd_paths, PSO_cd_time, PSO_cd_path_distance=point_connector_full(PSO_paths, [0]*num_agents, [0]*num_agents)
+        #make gif of the first trial
+        if trial==0 and gif:
+            print('making animation...')
+            paths_animator(PSO_cd_paths, maze_path, 'PSO_paths')
         PSO_time+=PSO_cd_time
         #total calculation time
         PSO_calculation_times.append(PSO_time)
@@ -579,14 +590,48 @@ def run_experiment(num_agents, num_trials, maze_path):
         PSO_path_times.append(total_PSO_path_time/num_agents)
     return RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times
 
-RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')
-print(RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times)
-print(np.average(RRT_calculation_times))
-print(np.average(PSO_calculation_times))
-print(np.average(RRT_path_distances))
-print(np.average(PSO_path_distances))
-print(np.average(RRT_path_times))
-print(np.average(PSO_path_times))
+def paths_animator(paths, maze_path, output_path):
+    frames=[]
+    m = Maze2D.from_pgm(maze_path)
+    max_path_length=0
+    for path in paths:
+        #print('path: ', path)
+        if len(path)>max_path_length:
+            max_path_length=len(path)
+    for i in range(max_path_length):
+        points_to_plot = []
+        for path in paths:
+            #keep final point
+            if i>len(path)-1:
+                point=path[len(path)-1]
+            else:
+                point=path[i]
+            points_to_plot.append(point)
+        fig=m.plot_single_points(points_to_plot)
+        # Save the figure to a BytesIO object
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight')  # Save as PNG in memory
+        buf.seek(0)  # Rewind the buffer to the beginning
+        image = Image.open(buf)  # Open image with PIL
+        frames.append(image)
+        plt.close(fig)
+    frames[0].save(output_path+".gif", save_all=True, append_images=frames[1:], duration=100, loop=0)
+
+
+RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,1, 'maze2.pgm', gif=True)
+
+
+# RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')
+# print(RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times)
+# print(np.average(RRT_calculation_times))
+# print(np.average(PSO_calculation_times))
+# print(np.average(RRT_path_distances))
+# print(np.average(PSO_path_distances))
+# print(np.average(RRT_path_times))
+# print(np.average(PSO_path_times))
+
+
+
 
 
 

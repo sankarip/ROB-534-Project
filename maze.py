@@ -9,6 +9,7 @@ from matplotlib.ticker import MultipleLocator
 from matplotlib.lines import Line2D
 matplotlib.use('TkAgg')
 
+
 class Maze(abc.ABC):
     """ Base Maze Class """
 
@@ -117,6 +118,29 @@ class Maze(abc.ABC):
         # Add legend
         ax1.legend(handles=legend_handles)
         plt.show()
+
+    def plot_single_points(self, points):
+        fig = plt.figure(1)
+        ax1 = fig.add_subplot(1,1,1)
+
+        spacing = 1.0 # Spacing between grid lines
+        minor_location = MultipleLocator(spacing)
+
+        # Set minor tick locations.
+        ax1.yaxis.set_minor_locator(minor_location)
+        ax1.xaxis.set_minor_locator(minor_location)
+
+        # Set grid to use minor tick locations.
+        ax1.grid(which='minor')
+
+        colors = ['b', 'r', 'y', 'g', 'm']
+        plt.imshow(self.maze_array.T, cmap=plt.get_cmap('bone'))
+        for i, point in enumerate(points):
+
+            x=point[0]
+            y=point[1]
+            plt.plot(x, y, marker='o', linestyle='none', color=colors[i])
+        return fig
 
     def get_goal(self):
         """
