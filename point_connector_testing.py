@@ -7,6 +7,52 @@ import numpy as np
 import pickle
 
 maze_path='maze2.pgm'
+
+def predict_position(x, y, velocity, orientation, time_step=1):
+    """Predicts position"""
+    x_new = x + math.cos(math.radians(orientation)) * velocity * time_step
+    y_new = y + math.sin(math.radians(orientation)) * velocity * time_step
+    return x_new, y_new
+
+
+def monitor_collisions(robot_states, goal, time_horizon=3, safety_radius=0.5):
+    """
+    Check collisions and return v for yielding robots
+    robot_states is list of [{id, x, y, velocity, orientation}], 1 for each robot
+    """
+    updates = {}
+    #track if something got updated
+    updated=False
+    for i, r1 in enumerate(robot_states):
+        for j, r2 in enumerate(robot_states):
+            if i >= j:  # Avoid duplicates
+                continue
+
+            # Compute priority  (closer to goal = higher priority)
+            p1 = math.sqrt((r1["x"] - goal[0]) ** 2 + (r1["y"] - goal[1]) ** 2)
+            p2 = math.sqrt((r2["x"] - goal[0]) ** 2 + (r2["y"] - goal[1]) ** 2)
+
+            for t in range(1, time_horizon + 1):
+                x1, y1 = predict_position(r1["x"], r1["y"], r1["velocity"], r1["orientation"], t)
+                x2, y2 = predict_position(r2["x"], r2["y"], r2["velocity"], r2["orientation"], t)
+
+                distance = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+                if distance < safety_radius:
+                    updated=True
+                    # Scale velocity based on proximity
+                    scale_factor = distance / safety_radius
+                    new_velocity = r1["velocity"] * scale_factor
+
+                    # Rob with lowest priorty (highest number) yileds
+                    if p1 < p2:
+                        updates[r2["id"]] = new_velocity
+                    else:
+                        updates[r1["id"]] = new_velocity
+                    break
+
+    return updates, updated
+
 def point_connector(point_list, orientation, velocity, stop=False):
     #0 degrees points right
     #-90 degrees points up
@@ -19,6 +65,8 @@ def point_connector(point_list, orientation, velocity, stop=False):
     #print('end point index: ', end_point_index)
     #inting to get rid of rounding errors
     cant_connect=False
+    velocities=[]
+    orientations=[]
     for i, point in enumerate(point_list):
         #print('new point index: ', i)
         if i==end_point_index:
@@ -71,6 +119,7 @@ def point_connector(point_list, orientation, velocity, stop=False):
                 velocity_change=-1
             #print(velocity_change)
             velocity+=velocity_change
+            velocities.append(velocity)
             if velocity>2:
                 velocity=2
             if orientation_change>10:
@@ -79,6 +128,7 @@ def point_connector(point_list, orientation, velocity, stop=False):
                 orientation_change=-10
             #apply orientation change
             orientation+=orientation_change
+            orientations.append(orientation)
             #print('orientation: ',orientation)
             x_change = math.cos(math.radians(orientation))*velocity
             y_change = math.sin(math.radians(orientation))*velocity
@@ -94,7 +144,150 @@ def point_connector(point_list, orientation, velocity, stop=False):
         if abs(point_diff_x)>0.1 or abs(point_diff_y)>0.1:
             cant_connect=True
 
-    return points, cant_connect, orientation, velocity
+    return points, cant_connect, orientation, velocity#, velocities, orientations
+
+
+def point_connector_full(point_lists, orientations, velocities, collision_avoidance=True):
+    #integrate collision avoidance
+    #0 degrees points right
+    #-90 degrees points up
+    #positive y is down
+    #positive x is to the right
+    #use distance between/angle to accelerate
+    #empty list to store points in
+    final_points=[[] for _ in range(len(point_lists))]
+    final_orientations = [[] for _ in range(len(point_lists))]
+    end_point_indexes=[]
+    curr_points=[]
+    next_points = []
+    point_indexes =[]
+    completed= [False] * len(point_lists)
+    #print('end point index: ', end_point_index)
+    #initialize starting points and points chasing
+    goal_points=[]
+    for j, point_list in enumerate(point_lists):
+        curr_points.append(point_list[0])
+        final_points[j].append(point_list[0])
+        next_points.append(point_list[1])
+        point_indexes.append(1)
+        end_point_indexes.append(len(point_list) - 1)
+        goal_points.append(point_list[end_point_indexes[j]])
+    while not all(completed):
+        robot_states=[]
+        for j, point_list in enumerate(point_lists):
+            p1=curr_points[j]
+            start_point=p1
+            p2=next_points[j]
+            #point_diff_x=p1[0]-p2[0]
+            #point_diff_y=p1[1]-p2[1]
+            orientation=orientations[j]
+            velocity=velocities[j]
+            dx = p2[0] - p1[0]
+            dy = p2[1] - p1[1]
+            distance=(dx**2+dy**2)**0.5
+            #print('distance: ',distance)
+            angle_rad = math.atan2(dy, dx)  # Angle in radians
+            angle_deg = math.degrees(angle_rad)
+            #print('desired angle: ', angle_deg)
+            #main advantage of this vs A* is that you can have small degree changes without a bunch of neighbors
+            orientation_change=angle_deg-orientation
+            #ignore small changes due to rounding errors
+            if math.isclose(orientation_change, 0, abs_tol=1e-9):
+                orientation_change=0
+            #print('orientation change: ',orientation_change)
+            # loose function for desired velocity (really bad PID)
+            if orientation_change!=0:
+                orientation_factor=abs(orientation_change)
+                #dont divide by really small numbers
+                if orientation_factor<=1:
+                    orientation_factor=1
+                desired_velocity=distance/orientation_factor
+                if desired_velocity<0.3:
+                    desired_velocity=0.3
+            else:
+                #update to factor in current velocity
+                desired_velocity=distance
+                if distance<3.5 and desired_velocity>1.5:
+                    desired_velocity=1.5
+                if distance<2.5 and desired_velocity>1:
+                    desired_velocity=1
+            velocity_change=desired_velocity-velocity
+            if velocity_change>1:
+                velocity_change=1
+            if velocity_change<-1:
+                velocity_change=-1
+            #print(velocity_change)
+            velocity+=velocity_change
+            if velocity>2:
+                velocity=2
+            if orientation_change>10:
+                orientation_change=10
+            if orientation_change<-10:
+                orientation_change=-10
+            #apply orientation change
+            orientation+=orientation_change
+            #print('orientation: ',orientation)
+            x_change = math.cos(math.radians(orientation))*velocity
+            y_change = math.sin(math.radians(orientation))*velocity
+            x=p1[0]+x_change
+            y=p1[1]+y_change
+            print('moving to: ',x,y)
+            p1=[x,y]
+            curr_points[j]=p1
+            point_diff_x=p1[0]-p2[0]
+            point_diff_y=p1[1]-p2[1]
+
+
+            #print('point: ',p1)
+            if completed[j]:
+                velocity=0
+                orientation=0
+            else:
+                velocities[j]=velocity
+                orientations[j]=orientation
+                final_points[j].append(p1)
+                final_orientations[j].append(orientation)
+            #found point
+            #or close to goal
+            x_dist_to_goal=p1[0]-goal_points[j][0]
+            y_dist_to_goal = p1[1] - goal_points[j][1]
+            if abs(x_dist_to_goal) < 0.5 and abs(y_dist_to_goal) < 0.5:
+                close_to_goal=True
+            else:
+                close_to_goal=False
+            if close_to_goal:
+                completed[j] = True
+                # stop moving
+                velocities[j] = 0
+            elif abs(point_diff_x)<0.1 or abs(point_diff_y)<0.1:
+                #if at goal
+                if point_indexes[j]==end_point_indexes[j]:
+                    completed[j]=True
+                    #stop moving
+                    velocities[j]=0
+                else:
+                    next_points[j]=point_lists[j][point_indexes[j]+1]
+                    point_indexes[j]=point_indexes[j]+1
+            robot_state={'id':j,'x':start_point[0], 'y':start_point[1], 'velocity':velocities[j],'orientation':orientations[j]}
+            robot_states.append(robot_state)
+        updates,updated=monitor_collisions(robot_states, (24,24))
+        if updated and collision_avoidance:
+            print('updating velocities')
+            robots_updated=list(updates.keys())
+            for robot in robots_updated:
+                new_velocity=updates[robot]
+                velocities[j]=new_velocity
+                old_start_point=final_points[j][len(final_points[j])-2]
+                #maybe messing things up?
+                old_orientation=final_orientations[j][len(final_points[j])-2]
+                x_change = math.cos(math.radians(old_orientation)) * new_velocity
+                y_change = math.sin(math.radians(old_orientation)) * new_velocity
+                new_point=[old_start_point[0]+x_change, old_start_point[1]+y_change]
+                curr_points[j]=new_point
+                final_points[j][len(final_points[j]) - 1]=new_point
+
+    return final_points#, orientations, velocitys
+
 
 def trig_testing():
     print(math.sin(math.radians(80)))
@@ -170,8 +363,12 @@ def RRT(maze_path):
         # multiply to spread points out
         unit_vector=[unit_vector[0]*2, unit_vector[1]*2]
         new_point=[[closest_point[0]+unit_vector[0], closest_point[1]+unit_vector[1]]]
+
         delta=(new_point[0][0]-closest_point[0],new_point[0][1]-closest_point[1])
-        blocked=m.check_hit(closest_point, delta)
+        try:
+            blocked=m.check_hit(closest_point, delta)
+        except:
+            blocked=True
         #START HERE
         #put velocity and orientation in points so that you can check feasible connection
         #print(closest_point[1], new_point[0])
@@ -206,17 +403,18 @@ def RRT(maze_path):
     return path
 #point_list=[[0,0], [4,7], [1,10]]#, [1,14]] #, [1,14],[5,15]
 #points=point_connector(point_list, 0, 0)
-m = Maze2D.from_pgm(maze_path)
-#m.plot_path(points, 'Maze2D')
-#paths=[points, [(0,0),[0,2], [2,2]]]
-#m.plot_multiple_paths(paths)
-path=RRT(maze_path)
-# filename = 'RRTpath.pkl'
-# with open(filename, 'wb') as file:
-#     pickle.dump(path, file)
-m.plot_path(path)
-points, cant_connect, orientation, velocity=point_connector(path, 0, 0)
-m.plot_path(points)
+def testing3():
+    m = Maze2D.from_pgm(maze_path)
+    #m.plot_path(points, 'Maze2D')
+    #paths=[points, [(0,0),[0,2], [2,2]]]
+    #m.plot_multiple_paths(paths)
+    path=RRT(maze_path)
+    # filename = 'RRTpath.pkl'
+    # with open(filename, 'wb') as file:
+    #     pickle.dump(path, file)
+    m.plot_path(path)
+    points, cant_connect, orientation, velocity=point_connector(path, 0, 0)
+    m.plot_path(points)
 # points2=point_connector(path[0:3], 0, 0)
 #m.plot_path(points2)
 def testing():
@@ -230,5 +428,26 @@ def testing():
     print(cant_connect)
 
 #testing()
+
+def testing_full_path():
+    #path1=[[0,0], [2,2]]
+    #path2 = [[0, 0], [1, 0], [2, 0]]
+    path1=RRT(maze_path)
+    path2=RRT(maze_path)
+    paths=[path1, path2]
+    orientations=[0,0]
+    velocities=[0,0]
+    points=point_connector_full(paths, orientations, velocities)
+    no_collsion_avoidance=point_connector_full(paths, orientations, velocities, False)
+    print(points)
+    m = Maze2D.from_pgm(maze_path)
+    m.plot_multiple_paths(points)
+    m.plot_multiple_paths(no_collsion_avoidance)
+
+testing_full_path()
+
+
+
+
 
 
