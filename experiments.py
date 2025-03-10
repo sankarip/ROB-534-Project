@@ -581,6 +581,12 @@ def run_experiment(num_agents, num_trials, maze_path):
 
 RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')
 print(RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times)
+print(np.average(RRT_calculation_times))
+print(np.average(PSO_calculation_times))
+print(np.average(RRT_path_distances))
+print(np.average(PSO_path_distances))
+print(np.average(RRT_path_times))
+print(np.average(PSO_path_times))
 
 
 
