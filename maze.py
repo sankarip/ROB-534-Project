@@ -142,6 +142,35 @@ class Maze(abc.ABC):
             plt.plot(x, y, marker='o', linestyle='none', color=colors[i],markersize=1)
         return fig
 
+    def plot_path_progression(self, points):
+        fig = plt.figure(figsize=(6,6))  # Set a consistent figure size
+        ax1 = fig.add_subplot(1,1,1)
+
+        spacing = 1.0  # Spacing between grid lines
+        minor_location = MultipleLocator(spacing)
+
+        # Set minor tick locations.
+        ax1.yaxis.set_minor_locator(minor_location)
+        ax1.xaxis.set_minor_locator(minor_location)
+
+        # Set grid to use minor tick locations.
+        ax1.grid(which='minor')
+
+        colors = ['b', 'r', 'y', 'g', 'm']  # Assign different colors to different agents
+        plt.imshow(self.maze_array.T, cmap=plt.get_cmap('bone'))
+
+        # Loop through each agent's trajectory and plot its full history
+        num_agents = len(points)  # Number of agents
+        for agent_id in range(num_agents):
+            agent_path = points[agent_id]  # Get the full path history of this agent
+            
+            if len(agent_path) > 1:
+                x_vals, y_vals = zip(*agent_path)  # Extract x and y coordinates
+                plt.plot(x_vals, y_vals, marker='o', linestyle='-', color=colors[agent_id % len(colors)], markersize=3)
+
+        return fig
+    
+
     def get_goal(self):
         """
             Returns the index of the goal
