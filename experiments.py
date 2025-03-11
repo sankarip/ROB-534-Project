@@ -70,7 +70,7 @@ def PSO(maze_path, start_state):
         path = np.array(path)
         if is_valid_path:
             #need to update orientation in other parts of code too
-            refined_path, cant_connect, orientation, velocity = point_connector(path, 90, 0)
+            refined_path, cant_connect, orientation, velocity = point_connector(path, 90, 0, m)
             if not cant_connect:
                 break
 
@@ -188,7 +188,7 @@ def monitor_collisions(robot_states, goal, time_horizon=1, safety_radius=0.5):
 
     return updates, updated
 
-def point_connector(point_list, orientation, velocity):
+def point_connector(point_list, orientation, velocity, maze):
     #0 degrees points right
     #-90 degrees points up
     #positive y is down
@@ -218,7 +218,8 @@ def point_connector(point_list, orientation, velocity):
         point_diff_x=p1[0]-p2[0]
         point_diff_y=p1[1]-p2[1]
         #while not (round(p1[0])==round(p2[0]) and round(p1[1])==round(p2[1])):
-        while (abs(point_diff_x)>0.1 or abs(point_diff_y)>0.1) and moves<15:
+        #changed
+        while (abs(point_diff_x)>0.15 or abs(point_diff_y)>0.15) and moves<15:
         #for i in range(0,10):
             moves+=1
             dx = p2[0] - p1[0]
@@ -272,13 +273,23 @@ def point_connector(point_list, orientation, velocity):
             y_change = math.sin(math.radians(orientation))*velocity
             x=p1[0]+x_change
             y=p1[1]+y_change
+            delta=(x-p1[0],y-p1[1])
+            try:
+                blocked=maze.check_hit(p1, delta)
+            except:
+                blocked=True
+            if blocked:
+                #print('blocked points: ', p1, (x,y))
+                cant_connect=True
+                break
             p1=[x,y]
             point_diff_x=p1[0]-p2[0]
             point_diff_y=p1[1]-p2[1]
             points.append(p1)
         #used to be indented one further, should fix error
         last_point=p1
-        if abs(point_diff_x)>0.1 or abs(point_diff_y)>0.1:
+        #changed
+        if abs(point_diff_x)>0.15 or abs(point_diff_y)>0.15:
             cant_connect=True
 
     return points, cant_connect, orientation, velocity#, velocities, orientations
@@ -507,9 +518,9 @@ def RRT(maze_path, start_state):
         vector_len=((new_point[0][0]-closest_point[0])**2+(new_point[0][1]-closest_point[1])**2)**0.5
         unit_vector=[(new_point[0][0]-closest_point[0])/vector_len,(new_point[0][1]-closest_point[1])/vector_len]
         # multiply to spread points out
-        unit_vector=[unit_vector[0]*2, unit_vector[1]*2]
+        #changed
+        unit_vector=[unit_vector[0]*2.5, unit_vector[1]*2.5]
         new_point=[[closest_point[0]+unit_vector[0], closest_point[1]+unit_vector[1]]]
-
         delta=(new_point[0][0]-closest_point[0],new_point[0][1]-closest_point[1])
         try:
             blocked=m.check_hit(closest_point, delta)
@@ -518,7 +529,7 @@ def RRT(maze_path, start_state):
         #START HERE
         #put velocity and orientation in points so that you can check feasible connection
         #print(closest_point[1], new_point[0])
-        points, kinodynamic_blocked, new_orientation, new_velocity = point_connector([closest_point, new_point[0]], current_orientation_velocity[0], current_orientation_velocity[1])
+        points, kinodynamic_blocked, new_orientation, new_velocity = point_connector([closest_point, new_point[0]], current_orientation_velocity[0], current_orientation_velocity[1], m)
         if not (blocked or kinodynamic_blocked):
             #print('unit vector: ',unit_vector)
             #print('new point: ',new_point)
@@ -639,6 +650,21 @@ def paths_animator(paths, maze_path, output_path):
 
 
 RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,1, 'maze2.pgm', gif=True)
+
+def plot_testing():
+    maze_path='spaced_maze.pgm'
+    m = Maze2D.from_pgm(maze_path)
+    maze_array=np.ones((25,25))
+    maze_array[0,0]=0
+    start=[-0.5,-0.5]
+    print([int(round(start[0])), int(round(start[1]))])
+    print(maze_array)
+    plt.imshow(maze_array.T, cmap=plt.get_cmap('bone'), extent=[0, 25, 25, 0])
+    plt.show()
+    #m.plot_path([[1,1],[2,2]])
+
+
+#plot_testing()
 
 
 # RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')

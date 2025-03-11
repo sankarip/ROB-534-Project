@@ -177,7 +177,9 @@ class Maze(abc.ABC):
             return False
 
         # discretize movement into steps
-        norm = max(abs(dx), abs(dy))
+        #changed
+        #add more steps for longer time/better checking
+        norm = max(abs(dx), abs(dy))*10
         dx = dx/norm
         dy = dy/norm
 
