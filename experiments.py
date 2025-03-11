@@ -621,24 +621,30 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
     return RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times
 
 def paths_animator(paths, maze_path, output_path):
-    frames=[]
+    frames = []
     m = Maze2D.from_pgm(maze_path)
-    max_path_length=0
-    for path in paths:
-        #print('path: ', path)
-        if len(path)>max_path_length:
-            max_path_length=len(path)
-    print('frames to animate: ', max_path_length)
+
+    max_path_length = max(len(path) for path in paths)  # Find longest path length
+    print('Frames to animate:', max_path_length)
+
+    # Initialize agent paths to store their movement history
+    agent_paths = [[] for _ in range(len(paths))]  # List of paths per agent
+
     for i in range(max_path_length):
-        points_to_plot = []
-        for path in paths:
-            #keep final point
-            if i>len(path)-1:
-                point=path[len(path)-1]
+        points_to_plot = []  # Stores current positions of all agents at this timestep
+
+        for agent_id, path in enumerate(paths):
+            if i < len(path):
+                point = path[i]  # Get agent's position at this time step
             else:
-                point=path[i]
-            points_to_plot.append(point)
-        fig=m.plot_single_points(points_to_plot)
+                point = path[-1]  # If agent has finished, keep last position
+            
+            agent_paths[agent_id].append(point)  # Store path history for each agent
+            points_to_plot.append(point)  # Store current position to plot
+
+        # Pass full history of each agent to the plot function
+        fig = m.plot_path_progression(agent_paths)
+
         # Save the figure to a BytesIO object
         buf = io.BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight')  # Save as PNG in memory
@@ -646,8 +652,9 @@ def paths_animator(paths, maze_path, output_path):
         image = Image.open(buf)  # Open image with PIL
         frames.append(image)
         plt.close(fig)
-    frames[0].save(output_path+".gif", save_all=True, append_images=frames[1:], duration=100, loop=0)
 
+    # Save animation as GIF
+    frames[0].save(output_path+".gif", save_all=True, append_images=frames[1:], duration=100, loop=0)
 
 RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,1, 'maze2.pgm', gif=True)
 
