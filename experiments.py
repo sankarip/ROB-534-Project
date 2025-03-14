@@ -493,7 +493,7 @@ def get_rand_point(range_start, range_end, maze):
             #print('goal checking: ', val_x, val_y)
     return val_x, val_y
 
-def RRT(maze_path, start_state):
+def RRT(maze_path, start_state, start_orientation, start_velocity):
     m = Maze2D.from_pgm(maze_path)
     goal_state=m.goal_state
     #start_index=m.start_index
@@ -503,7 +503,7 @@ def RRT(maze_path, start_state):
     vertexes.append(start_state)
     orientation_velocity=[]
     #update orientation here
-    orientation_velocity.append([90,0])
+    orientation_velocity.append([start_orientation,start_velocity])
     edges=[]
     start_time = time.time()
     while not solved:
@@ -515,6 +515,7 @@ def RRT(maze_path, start_state):
         distance, index = neighbors.kneighbors(new_point)
         closest_point = points_array[index[0][0]]
         current_orientation_velocity = orientation_velocity[index[0][0]]
+        #print(current_orientation_velocity)
         vector_len=((new_point[0][0]-closest_point[0])**2+(new_point[0][1]-closest_point[1])**2)**0.5
         unit_vector=[(new_point[0][0]-closest_point[0])/vector_len,(new_point[0][1]-closest_point[1])/vector_len]
         # multiply to spread points out
@@ -588,7 +589,7 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
             PSO_paths.append(PSO_path)
             PSO_time+=PSO_run_time
         #cd for collision detections
-        RRT_cd_paths, RRT_cd_time, RRT_cd_path_distance=point_connector_full(RRT_paths, [0]*num_agents, [0]*num_agents)
+        RRT_cd_paths, RRT_cd_time, RRT_cd_path_distance=point_connector_full(RRT_paths, [90]*num_agents, [0]*num_agents)
         #make gif of the first trial
         if trial==0 and gif:
             print('making RRT animation...')
@@ -656,7 +657,7 @@ def paths_animator(paths, maze_path, output_path):
     # Save animation as GIF
     frames[0].save(output_path+".gif", save_all=True, append_images=frames[1:], duration=100, loop=0)
 
-RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,1, 'maze2.pgm', gif=True)
+#RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,1, 'maze2.pgm', gif=True)
 
 def plot_testing():
     maze_path='spaced_maze.pgm'
@@ -673,8 +674,53 @@ def plot_testing():
 
 #plot_testing()
 
+def RRT_testing():
+    maze_path='simple_maze.pgm'
+    path,_,_=RRT(maze_path, (3,0), 90, 0)
+    m = Maze2D.from_pgm(maze_path)
+    m.plot_path(path)
+    connected, _,_=point_connector_full([path], [90],[0])
+    print(connected)
+    m.plot_path(connected[0])
 
-# RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(3,10, 'maze2.pgm')
+#RRT_testing()
+
+def collision_checking():
+    maze_path='simple_maze.pgm'
+    m = Maze2D.from_pgm(maze_path)
+    #bad points
+    point=np.float64(3.595429195484451), np.float64(5.913372577372046)
+    next_point=np.float64(4.144487309269414), np.float64(7.090398711886142)
+    delta=(next_point[0]-point[0],next_point[1]-point[1])
+    blocked = m.check_hit(point, delta)
+    ###shouldn't be allowed, but RRT is adding it
+    #will investigate more
+    print(blocked)
+
+collision_checking()
+
+
+# RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(5,10, 'maze2.pgm')
+# def save_pickle(data, filename):
+#     with open(filename, 'wb') as f:
+#         pickle.dump(data, f)
+# save_pickle(RRT_calculation_times, 'RRT_calc_time.pkl')
+# save_pickle(RRT_path_distances, 'RRT_path_dist.pkl')
+# save_pickle(PSO_calculation_times, 'PSO_calc_time.pkl')
+# save_pickle(PSO_path_distances, 'PSO_path_dist.pkl')
+
+
+def plot_with_error_bars(data_list, labels):
+    means = [np.mean(lst) for lst in data_list]
+    std_errors = [np.std(lst, ddof=1) / np.sqrt(len(lst)) for lst in data_list]  # Mean standard error
+
+    plt.figure(figsize=(8, 6))
+    plt.bar(labels, means, yerr=std_errors, capsize=5, alpha=0.7, color='b')
+    plt.xlabel('Category')
+    plt.ylabel('Average Value')
+    plt.title('Bar Plot with Mean Standard Error')
+    plt.show()
+
 # print(RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times)
 # print(np.average(RRT_calculation_times))
 # print(np.average(PSO_calculation_times))
