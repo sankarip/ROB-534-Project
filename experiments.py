@@ -429,16 +429,16 @@ def point_connector_full(point_lists, orientations, velocities, collision_avoida
             robot_states.append(robot_state)
         updates, updated = monitor_collisions(robot_states, (24, 24))
         if updated and collision_avoidance:
-            if first_update:
-                print('robot states leading to collision: ', robot_states)
+            #if first_update:
+                #print('robot states leading to collision: ', robot_states)
             robots_updated = list(updates.keys())
-            if first_update:
-                print('updating these robots: ', robots_updated)
-                print('final_points before updating: ', final_points)
+            # if first_update:
+            #     print('updating these robots: ', robots_updated)
+            #     print('final_points before updating: ', final_points)
             for robot in robots_updated:
                 new_velocity = updates[robot]
-                if first_update:
-                    print('robot: ', robot, ' new velocity: ', new_velocity)
+                # if first_update:
+                #     print('robot: ', robot, ' new velocity: ', new_velocity)
                 velocities[robot] = new_velocity
                 old_start_point = final_points[robot][len(final_points[robot]) - 2]
                 # maybe messing things up?
@@ -446,12 +446,12 @@ def point_connector_full(point_lists, orientations, velocities, collision_avoida
                 x_change = math.cos(math.radians(old_orientation)) * new_velocity
                 y_change = math.sin(math.radians(old_orientation)) * new_velocity
                 new_point = [old_start_point[0] + x_change, old_start_point[1] + y_change]
-                if first_update:
-                    print('robot: ', robot, ' new point: ', new_point)
+                # if first_update:
+                #     print('robot: ', robot, ' new point: ', new_point)
                 curr_points[robot] = new_point
                 final_points[robot][len(final_points[robot]) - 1] = new_point
-            if first_update:
-                print('final_points after updating: ', final_points)
+            #if first_update:
+                #print('final_points after updating: ', final_points)
             first_update = False
     run_time = time.time() - start_time
     # sum distance of all paths
@@ -586,7 +586,7 @@ def RRT(maze_path, start_state, start_orientation, start_velocity):
     return path, run_time, path_distance,
 
 
-def run_experiment(num_agents, num_trials, maze_path, gif=False):
+def run_experiment(num_agents, num_trials, maze_path, gif=False, save=True):
     RRT_calculation_times = []
     RRT_path_distances = []
     RRT_path_times = []
@@ -651,6 +651,16 @@ def run_experiment(num_agents, num_trials, maze_path, gif=False):
         PSO_path_times.append(total_PSO_path_time / num_agents)
     plot_with_error_bars([RRT_calculation_times, PSO_calculation_times], ['RRT Calculation Time', 'PSO Calculation Time'], y_axis_label='Seconds', title='PSO and RRT Comparison')
     plot_with_error_bars([RRT_path_distances, PSO_path_distances], ['RRT Path Length', 'PSO Path Length'], y_axis_label='Units', title='PSO and RRT Comparison')
+    if save:
+        save_pickle(RRT_calculation_times, 'RRT_calc_times.pkl')
+        save_pickle(RRT_path_distances, 'RRT_path_dists.pkl')
+        save_pickle(RRT_path_times, 'RRT_path_times.pkl')
+        save_pickle(PSO_calculation_times, 'PSO_calc_times.pkl')
+        save_pickle(PSO_path_distances, 'PSO_path_dists.pkl')
+        save_pickle(PSO_path_times, 'PSO_path_times.pkl')
+        print('data saved')
+
+
     return RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times
 
 
@@ -711,6 +721,7 @@ def open_pickle(file_name):
         data = pickle.load(file)
     return data
 
+#run experiments
 RRT_calculation_times, RRT_path_distances, RRT_path_times, PSO_calculation_times, PSO_path_distances, PSO_path_times= run_experiment(2,2, 'maze2.pgm', gif=False)
 
 def plot_testing():
